@@ -1,0 +1,41 @@
+/*
+[
+  0 - FRR, 
+  1 - BID, 
+  2 - BID_PERIOD,
+  3 - BID_SIZE,   
+  4 - ASK, 
+  5 - ASK_PERIOD,
+  6 - ASK_SIZE,  
+  7 - DAILY_CHANGE,
+  8 - DAILY_CHANGE_PERC, 
+  9 - LAST_PRICE,
+  10 - VOLUME,
+  11 - HIGH, 
+  12 - LOW,
+  13 - PLACEHOLDER,
+  14 - PLACEHOLDER,
+  15 - FRR_AMOUNT_AVAILABLE
+]
+*/
+[
+    [
+        "fBTC",
+        0.000043046575342465755,
+        0.00002,
+        30,
+        209.95039641000002,
+        0.00005764,
+        2,
+        29.406596810000014,
+        0.00001825,
+        0.1825,
+        0.000058,
+        5975.74446347,
+        0.0000981,
+        3e-8,
+        null,
+        null,
+        0
+    ]
+]

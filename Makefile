@@ -19,10 +19,10 @@ all: lint install
 include contrib/devtools/Makefile
 
 build: go.sum
-	@go build -mod=readonly ./...
+	@go build -o ./build/dm-server -mod=readonly $(BUILD_FLAGS) 
 
 install: go.sum
-		go install -mod=readonly $(BUILD_FLAGS) ./app
+	@install -mod=readonly $(BUILD_FLAGS) ./app
 
 
 ########################################
