@@ -14,5 +14,5 @@ socket.addEventListener('message', function (event) {
     var data = JSON.parse(event.data)
     console.log('Message from server', data);
     elPrice.innerHTML = `USD ${data.avgPrice.toFixed(8)}`;
-    elVolume.innerHTML = `USD ${data.avgVolumen.toFixed(8)}`;
+    elVolume.innerHTML = `USD ${data.avgVolumen.toFixed(10)}`;
 });

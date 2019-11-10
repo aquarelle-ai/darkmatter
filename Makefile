@@ -1,22 +1,19 @@
 #!/usr/bin/make -f
 
-PACKAGES=$(shell go list ./... | grep -v '/simulation')
+PACKAGES=$(shell go list ./...')
 
 VERSION := $(shell echo $(shell git describe --tags) | sed 's/^v//')
 COMMIT := $(shell git log -1 --format='%H')
 
 export GO111MODULE = on
 
-ldflags = -X cratos.network/darkmatter/version.Name=PriceTracker \
+ldflags = -X cratos.network/darkmatter/version.Name=DarkMatterServer \
 	-X cratos.network/darkmatter/version.Version=$(VERSION) \
-	-X cratos.network/darkmatter/version.Commit=$(COMMIT) \
-	-X "cratos.network/darkmatter/version.BuildTags=$(build_tags)"
+	-X cratos.network/darkmatter/version.Commit=$(COMMIT)"
 
-BUILD_FLAGS := -tags "$(build_tags)" -ldflags '$(ldflags)'
+BUILD_FLAGS := -ldflags '$(ldflags)'
 
 all: lint install
-
-include contrib/devtools/Makefile
 
 build: go.sum
 	@go build -o ./build/dm-server -mod=readonly $(BUILD_FLAGS) 
