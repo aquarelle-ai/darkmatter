@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"cratos.network/darkmatter/types"
+	"aquarelle.ai/darkmatter/types"
 )
 
 const (

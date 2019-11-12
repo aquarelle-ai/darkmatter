@@ -4,10 +4,11 @@
 package service
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
-	"cratos.network/darkmatter/types"
+	"aquarelle.ai/darkmatter/types"
 	"github.com/gorilla/websocket"
 )
 
@@ -15,18 +16,18 @@ const (
 	PUBLIC_DIRECTORY_PATH = "./public"
 )
 
-var clients = make(map[*websocket.Conn]bool)  // connected clients
-var broadcast = make(chan types.PriceMessage) // Broadcast channel
+var clients = make(map[*websocket.Conn]bool)           // connected clients
+var broadcast = make(chan types.LiteIndexValueMessage) // Broadcast channel
 var upgrader = websocket.Upgrader{}
 
 type OracleServer struct {
 	// Channel to se
-	Published chan types.PriceMessage
-	Broadcast chan types.PriceMessage
+	Published chan types.FullSignedBlock
+	Broadcast chan types.LiteIndexValueMessage
 	Clients   map[*websocket.Conn]bool
 }
 
-func NewOracleServer(published chan types.PriceMessage) OracleServer {
+func NewOracleServer(published chan types.FullSignedBlock) OracleServer {
 	return OracleServer{
 		Published: published,
 		Broadcast: broadcast,
@@ -74,8 +75,16 @@ func (o OracleServer) handlePriceListeners(w http.ResponseWriter, r *http.Reques
 		msg := <-o.Published // Get a message from the public queue
 		log.Printf("MESSAGE: Volume=%f, HighPrice=%f", msg.AverageVolume, msg.AveragePrice)
 
+		liteMessage := types.LiteIndexValueMessage{
+			Height:      msg.Height,
+			PriceIndex:  msg.AveragePrice,
+			Quoted:      msg.Ticker,
+			NodeAddress: fmt.Sprintf("http://localhost/node/%s", msg.Hash),
+			Timestamp:   msg.Timestamp,
+		}
+
 		// Send the newly received message to the broadcast channel
-		o.Broadcast <- msg
+		o.Broadcast <- liteMessage
 	}
 }
 

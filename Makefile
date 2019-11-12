@@ -7,9 +7,9 @@ COMMIT := $(shell git log -1 --format='%H')
 
 export GO111MODULE = on
 
-ldflags = -X cratos.network/darkmatter/version.Name=DarkMatterServer \
-	-X cratos.network/darkmatter/version.Version=$(VERSION) \
-	-X cratos.network/darkmatter/version.Commit=$(COMMIT)"
+ldflags = -X aquarelle.ai/darkmatter/version.Name=DarkMatterServer \
+	-X aquarelle.ai/darkmatter/version.Version=$(VERSION) \
+	-X aquarelle.ai/darkmatter/version.Commit=$(COMMIT)"
 
 BUILD_FLAGS := -ldflags '$(ldflags)'
 
@@ -45,7 +45,7 @@ lint:
 ### Documentation
 
 godocs:
-	@echo "--> Wait a few seconds and visit http://localhost:6060/pkg/github.com/cratos.network/darkmatter/types"
+	@echo "--> Wait a few seconds and visit http://localhost:6060/pkg/github.com/aquarelle.ai/darkmatter/types"
 	godoc -http=:6060
 
 

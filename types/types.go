@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"time"
@@ -18,8 +19,8 @@ import (
 const (
 	ServiceHash = "1d0684170dcf58ed2499d233be72b5dde48d8124cb617f1309bae85da2fe85cf"
 
-	ChainDataDir       = "./chain"
-	LatestHashFileName = ChainDataDir + "/latest-hash"
+	ChainDataDir        = "./chain"
+	LatestBlockFileName = ChainDataDir + "/latest-block.json"
 )
 
 // The model used to get the data
@@ -52,61 +53,83 @@ func (info PriceSummary) String() string {
 	return string(result)
 }
 
+// Message used to be send to users and index the blocks
+type LiteIndexValueMessage struct {
+	Height      int64   `json:"height"`
+	PriceIndex  float64 `json:"priceIndex"`
+	Quoted      string  `json:"quote"`
+	NodeAddress string  `json:"nodeAddress"`
+	Timestamp   int64   `json:"timestamp"`
+}
+
 /**************   Service´s Public Messages ******************/
 // Message to send to the connected clients through websocket
-type PriceMessage struct {
-	Height        int      `json:"height"`
+type FullSignedBlock struct {
+	Hash         string `json:"hash"`
+	Height       int64  `json:"height"`
+	Timestamp    int64  `json:"timestamp"`
+	PreviousHash string `json:"previousHash"`
+	MerkleRoot   string `json:"merkleRoot"`
+
 	AveragePrice  float64  `json:"avgPrice"`
 	AverageVolume float64  `json:"avgVolumen"`
-	UID           string   `json:"uid"`
 	Ticker        string   `json:"ticker"`
-	Timestamp     int64    `json:"timestamp"`
-	Hash          string   `json:"hash"`
-	Seed          string   `json:"seed"`
-	PreviousHash  string   `json:"previousHash"`
 	Sources       []Result `json:"sources"`
 }
 
-var previousHash string
-var height int
+// Store the current last block in memory. Used to create the chain
+var latestBlock *FullSignedBlock
 
 // Return a new message with
-func NewPriceMessage(uid string, ticker string, avgPrice float64, avgVolumen float64, sources []Result) PriceMessage {
+func NewFullSignedBlock(uid string, ticker string, avgPrice float64, avgVolumen float64, sources []Result) FullSignedBlock {
 
 	// Create a "protomessage" in order to be hashed with the hash inside
-	newSeed, _ := GenerateRandomString(64)
-	msg := PriceMessage{
+	var latestHash string
+	var height int64
+
+	if latestBlock == nil { // try to get the stored block
+		latestBlock = readLatestBlock()
+	}
+
+	if latestBlock != nil {
+		latestHash = latestBlock.Hash   // Yes, there is a latest block, so there is a "latest" of everything
+		height = latestBlock.Height + 1 // And a new heigth
+	}
+
+	block := FullSignedBlock{
 		Height:        height,
 		AveragePrice:  avgVolumen,
 		AverageVolume: avgPrice,
-		UID:           uid,
 		Ticker:        ticker,
 		Timestamp:     time.Now().Unix(),
-		Seed:          newSeed,
-		PreviousHash:  previousHash,
+		PreviousHash:  latestHash, // Chain the current hash with the previous one
 		Sources:       sources,
 	}
 
-	bytes, err := json.Marshal(msg)
+	bytes, err := json.Marshal(block)
 	if err != nil {
 		log.Println("Error serializing message", err)
 	}
-	fullText := fmt.Sprintf("%s:%s", ServiceHash, string(bytes))
-	log.Println("Text to hash", fullText)
-	msg.Hash = fmt.Sprintf("%x", sha256.Sum256([]byte(fullText)))
+	// Sign the content of block including the hash of DarkMatter
+	rawContent := fmt.Sprintf("%s:%s", ServiceHash, bytes)
+	log.Println("Text to hash", rawContent)
 
-	// Chain the current hash with the previous one
-	previousHash = msg.Hash
-	height++ // The next new height
+	// Double hash for the content
+	doubleHash := fmt.Sprintf("%x", sha256.Sum256([]byte(rawContent)))
+	doubleHash = fmt.Sprintf("%x", sha256.Sum256([]byte(doubleHash)))
+	block.Hash = doubleHash
+
+	latestBlock = &block
 	// and keep it safe
-	storeLatestHash()
+	storeLatestBlock()
 
-	return msg
+	return block
 }
 
 // Store the latest hash of the message
-func storeLatestHash() {
+func storeLatestBlock() {
 
+	// Check if exists the folder to store the block
 	if _, err := os.Stat(ChainDataDir); os.IsNotExist(err) {
 		err = os.Mkdir(ChainDataDir, os.ModeDir)
 		if err != nil {
@@ -114,16 +137,53 @@ func storeLatestHash() {
 		}
 	}
 
-	f, err := os.Create(LatestHashFileName)
+	f, err := os.Create(LatestBlockFileName)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	defer f.Close()
 
-	f.WriteString(fmt.Sprintf("%d:%s:%d", height, previousHash, time.Now().Unix()))
-	f.Sync()
+	bytes, err := json.Marshal(latestBlock)
+	if err != nil {
+		log.Fatal(err)
+		return // Don´t continue
+	}
 
+	f.WriteString(string(bytes))
+	f.Sync()
+}
+
+func readLatestBlock() *FullSignedBlock {
+
+	// Check if exists the folder to store the block
+	if _, err := os.Stat(LatestBlockFileName); os.IsNotExist(err) {
+		log.Fatal(err)
+		return nil
+	}
+
+	f, err := os.Open(LatestBlockFileName)
+	if err != nil {
+		log.Fatal(err)
+		return nil
+	}
+
+	defer f.Close()
+
+	bytes, err := ioutil.ReadAll(f)
+	if err != nil {
+		log.Fatal(err)
+		return nil
+	}
+
+	var block FullSignedBlock
+	err = json.Unmarshal(bytes, &block)
+	if err != nil {
+		log.Fatal(err)
+		return nil // Don´t continue
+	}
+
+	return &block
 }
 
 /**************** Map & Reduce types ***************************/

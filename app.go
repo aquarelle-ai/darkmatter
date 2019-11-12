@@ -7,10 +7,10 @@ import (
 	"log"
 	"net/http"
 
-	"cratos.network/darkmatter/crawlers"
-	"cratos.network/darkmatter/mapreduce"
-	"cratos.network/darkmatter/service"
-	"cratos.network/darkmatter/types"
+	"aquarelle.ai/darkmatter/crawlers"
+	"aquarelle.ai/darkmatter/mapreduce"
+	"aquarelle.ai/darkmatter/service"
+	"aquarelle.ai/darkmatter/types"
 )
 
 // List of available crawlers
@@ -20,7 +20,7 @@ var directory = []types.PriceSourceCrawler{
 	crawlers.NewBitfinexCrawler(),
 }
 
-var publishedPrices = make(chan types.PriceMessage)
+var publishedPrices = make(chan types.FullSignedBlock)
 
 func main() {
 

@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"reflect"
 
-	"cratos.network/darkmatter/types"
+	"aquarelle.ai/darkmatter/types"
 )
 
 const (

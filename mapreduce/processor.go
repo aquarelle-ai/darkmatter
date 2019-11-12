@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"cratos.network/darkmatter/types"
+	"aquarelle.ai/darkmatter/types"
 	"github.com/google/uuid"
 )
 
@@ -23,10 +23,10 @@ type Processor struct {
 
 	Directory       []types.PriceSourceCrawler
 	QuotedCurrency  string
-	PublicationChan chan types.PriceMessage
+	PublicationChan chan types.FullSignedBlock
 }
 
-func NewMapReduceProcessor(directory []types.PriceSourceCrawler, quotedCurrency string, publicationChan chan types.PriceMessage) Processor {
+func NewMapReduceProcessor(directory []types.PriceSourceCrawler, quotedCurrency string, publicationChan chan types.FullSignedBlock) Processor {
 	// Channels to build the worker pool
 	return Processor{
 		Directory:       directory,
@@ -106,7 +106,7 @@ func (p Processor) reduceJobs(poolSize int) {
 	}
 
 	// Create a message to send to service´s listeners
-	newMsg := types.NewPriceMessage(
+	newMsg := types.NewFullSignedBlock(
 		uid,
 		ticker,
 		totalPrice/float64(poolSize), // Average price
