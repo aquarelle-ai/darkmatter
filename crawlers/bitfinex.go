@@ -6,8 +6,9 @@ package crawlers
 import (
 	"encoding/json"
 	"reflect"
+	"time"
 
-	"aquarelle.ai/darkmatter/types"
+	"aquarelle-tech/darkmatter/types"
 )
 
 const (
@@ -40,16 +41,16 @@ func (c BitfinexCrawler) GetTicker() string {
 }
 
 // Serializes a json to a TickerInfo24 type
-func (c BitfinexCrawler) ToPriceSummary(jsonData []byte) types.PriceSummary {
+func (c BitfinexCrawler) ToQuotePriceInfo(jsonData []byte) types.QuotePriceInfo {
 
-	var result types.PriceSummary
+	var result types.QuotePriceInfo
 
 	aux := make([]interface{}, 16)
 	if err := json.Unmarshal(jsonData, &aux); err != nil {
 		panic(err)
 	}
 
-	result = types.PriceSummary{}
+	result = types.QuotePriceInfo{}
 	result.Volume = getFloat(aux[7])
 	result.HighPrice = getFloat(aux[8])
 	// result.OpenPrice, _ = strconv.ParseFloat(aux.OpenPrice, 32)
@@ -72,8 +73,8 @@ func (c BitfinexCrawler) SetTicker(quotedCurrency string) {
 	}
 }
 
-// Helper function to convert the json from Bitfinex´s API to a PriceSummary instance
-func (c BitfinexCrawler) Crawl(quotedCurrency string, done chan types.PriceSummary) {
+// Helper function to convert the json from Bitfinex´s API to a QuotePriceInfo instance
+func (c BitfinexCrawler) Crawl(quotedCurrency string, done chan types.QuotePriceInfo) {
 
 	c.SetTicker(quotedCurrency)
 	jsonData, err := c.DataCrawler.Get()
@@ -82,5 +83,8 @@ func (c BitfinexCrawler) Crawl(quotedCurrency string, done chan types.PriceSumma
 		return
 	}
 
-	done <- c.ToPriceSummary(jsonData)
+	priceInfo := c.ToQuotePriceInfo(jsonData)
+	priceInfo.Timestamp = time.Now().Unix()
+	priceInfo.DataUrl = BITFINEX_APIURL
+	done <- priceInfo
 }

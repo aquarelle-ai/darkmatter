@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"aquarelle.ai/darkmatter/types"
+	"aquarelle-tech/darkmatter/types"
 )
 
 const (
@@ -34,9 +34,9 @@ func (client UpBitCrawler) GetName() string {
 }
 
 // Serializes a json to a TickerInfo24 type
-func (c UpBitCrawler) ToPriceSummary(jsonData []byte) types.PriceSummary {
+func (c UpBitCrawler) ToQuotePriceInfo(jsonData []byte) types.QuotePriceInfo {
 
-	var result types.PriceSummary
+	var result types.QuotePriceInfo
 	aux := struct {
 		Volume    string `json:"volume_24h"`
 		HighPrice string `json:"high_market_ask"`
@@ -46,7 +46,7 @@ func (c UpBitCrawler) ToPriceSummary(jsonData []byte) types.PriceSummary {
 		panic(err)
 	}
 
-	result = types.PriceSummary{}
+	result = types.QuotePriceInfo{}
 	result.Volume, _ = strconv.ParseFloat(aux.Volume, 32)
 	// result.QuoteVolume, _ = strconv.ParseFloat(aux.QuoteVolume, 32)
 	result.HighPrice, _ = strconv.ParseFloat(aux.HighPrice, 32)
@@ -55,14 +55,14 @@ func (c UpBitCrawler) ToPriceSummary(jsonData []byte) types.PriceSummary {
 	return result
 }
 
-// Helper function to convert the json from UpBit´s API to a PriceSummary instance
-func (c UpBitCrawler) Crawl() types.PriceSummary {
+// Helper function to convert the json from UpBit´s API to a QuotePriceInfo instance
+func (c UpBitCrawler) Crawl() types.QuotePriceInfo {
 
 	jsonData, err := c.DataCrawler.Get()
 	if err != nil {
 		panic(err)
 	}
-	info := c.ToPriceSummary(jsonData)
+	info := c.ToQuotePriceInfo(jsonData)
 
 	return info
 }

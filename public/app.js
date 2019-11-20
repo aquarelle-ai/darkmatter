@@ -1,4 +1,6 @@
 
+var data;
+
 var elPrice = document.getElementById("price")
 // Crea una nueva conexión.
 const socket = new WebSocket('ws://localhost:8080/price');
@@ -10,7 +12,14 @@ socket.addEventListener('open', function (event) {
 
 // Escucha por mensajes
 socket.addEventListener('message', function (event) {
-    var data = JSON.parse(event.data)
+    data = JSON.parse(event.data)
     console.log('Message from server', data);
     elPrice.innerHTML = `USD ${data.priceIndex.toFixed(8)}`;
 });
+
+var app = new VTTCue({
+    el: '#app',
+    data: {
+        latestBlock : data
+    }
+})

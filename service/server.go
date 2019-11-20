@@ -4,11 +4,14 @@
 package service
 
 import (
-	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 
-	"aquarelle.ai/darkmatter/types"
+	"path/filepath"
+
+	"aquarelle-tech/darkmatter/types"
 	"github.com/gorilla/websocket"
 )
 
@@ -55,10 +58,22 @@ func (o OracleServer) broadcastMessages() {
 	}
 }
 
+func setupResponse(w *http.ResponseWriter, req *http.Request) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+}
+
 // This function will receive and register all the new listeners
 func (o OracleServer) handlePriceListeners(w http.ResponseWriter, r *http.Request) {
 
+	setupResponse(&w, r)
+	if (*r).Method == "OPTIONS" {
+		return
+	}
+
 	// Try to upgrade the connection. If it fails, the log, but not break the execution
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Fatal(err)
@@ -76,11 +91,13 @@ func (o OracleServer) handlePriceListeners(w http.ResponseWriter, r *http.Reques
 		log.Printf("MESSAGE: Volume=%f, HighPrice=%f", msg.AverageVolume, msg.AveragePrice)
 
 		liteMessage := types.LiteIndexValueMessage{
-			Height:      msg.Height,
-			PriceIndex:  msg.AveragePrice,
-			Quoted:      msg.Ticker,
-			NodeAddress: fmt.Sprintf("http://localhost/node/%s", msg.Hash),
-			Timestamp:   msg.Timestamp,
+			Hash:          msg.Hash,
+			Height:        msg.Height,
+			PriceIndex:    msg.AveragePrice,
+			Quoted:        msg.Ticker,
+			NodeAddress:   msg.Address,
+			Timestamp:     msg.Timestamp,
+			Confirmations: len(msg.Evidence),
 		}
 
 		// Send the newly received message to the broadcast channel
@@ -88,11 +105,40 @@ func (o OracleServer) handlePriceListeners(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+func serveChain(w http.ResponseWriter, r *http.Request) {
+	setupResponse(&w, r)
+
+	println("Llegando a solicitar  un fichero")
+	path := filepath.Join("public", filepath.Clean(r.URL.Path))
+
+	println(path)
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		println("El fichero no existe")
+
+		//log.Fatal((err))
+
+		http.Error(w, "The requested block doesn´t exists.", http.StatusInternalServerError)
+
+	} else {
+		println("Intentando leer el fichero")
+		blockContent, err := ioutil.ReadFile(path)
+		if err == nil {
+			// Send the blockContent
+			w.Write([]byte(blockContent))
+
+		} else {
+			// log.Fatal((err))
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+	}
+}
+
 // Prepare and start the main routines
 func (o OracleServer) Initialize() {
 	// To send back a html page by default
-	fs := http.FileServer(http.Dir(PUBLIC_DIRECTORY_PATH))
-	http.Handle("/", fs)
+	// fs := http.FileServer(http.Dir(PUBLIC_DIRECTORY_PATH))
+	http.HandleFunc("/", serveChain)
 
 	// The main route to get the websocket path
 	http.HandleFunc("/price", o.handlePriceListeners)

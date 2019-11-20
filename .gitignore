@@ -12,3 +12,6 @@
 *.out
 # Failing files
 NUL
+node_modules
+/**/chain
+/build

@@ -6,8 +6,9 @@ package crawlers
 import (
 	"encoding/json"
 	"strconv"
+	"time"
 
-	"aquarelle.ai/darkmatter/types"
+	"aquarelle-tech/darkmatter/types"
 )
 
 const (
@@ -42,9 +43,9 @@ func (c LiquidCrawler) GetTicker() string {
 }
 
 // Serializes a json to a TickerInfo24 type
-func (c LiquidCrawler) ToPriceSummary(jsonData []byte) types.PriceSummary {
+func (c LiquidCrawler) ToQuotePriceInfo(jsonData []byte) types.QuotePriceInfo {
 
-	var result types.PriceSummary
+	var result types.QuotePriceInfo
 	aux := struct {
 		Volume    string `json:"volume_24h"`
 		HighPrice string `json:"high_market_ask"`
@@ -54,7 +55,7 @@ func (c LiquidCrawler) ToPriceSummary(jsonData []byte) types.PriceSummary {
 		panic(err)
 	}
 
-	result = types.PriceSummary{}
+	result = types.QuotePriceInfo{}
 	result.Volume, _ = strconv.ParseFloat(aux.Volume, 32)
 	// result.QuoteVolume, _ = strconv.ParseFloat(aux.QuoteVolume, 32)
 	result.HighPrice, _ = strconv.ParseFloat(aux.HighPrice, 32)
@@ -63,13 +64,16 @@ func (c LiquidCrawler) ToPriceSummary(jsonData []byte) types.PriceSummary {
 	return result
 }
 
-// Helper function to convert the json from Liquid´s API to a PriceSummary instance
-func (c LiquidCrawler) Crawl(quotedCurrency string, done chan types.PriceSummary) {
+// Helper function to convert the json from Liquid´s API to a QuotePriceInfo instance
+func (c LiquidCrawler) Crawl(quotedCurrency string, done chan types.QuotePriceInfo) {
 
 	jsonData, err := c.DataCrawler.Get()
 	if err != nil {
 		return
 	}
 
-	done <- c.ToPriceSummary(jsonData)
+	priceInfo := c.ToQuotePriceInfo(jsonData)
+	priceInfo.Timestamp = time.Now().Unix()
+	priceInfo.DataUrl = LIQUID_APIURL
+	done <- priceInfo
 }

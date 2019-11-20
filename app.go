@@ -7,14 +7,14 @@ import (
 	"log"
 	"net/http"
 
-	"aquarelle.ai/darkmatter/crawlers"
-	"aquarelle.ai/darkmatter/mapreduce"
-	"aquarelle.ai/darkmatter/service"
-	"aquarelle.ai/darkmatter/types"
+	"aquarelle-tech/darkmatter/crawlers"
+	"aquarelle-tech/darkmatter/mapreduce"
+	"aquarelle-tech/darkmatter/service"
+	"aquarelle-tech/darkmatter/types"
 )
 
 // List of available crawlers
-var directory = []types.PriceSourceCrawler{
+var directory = []types.PriceEvidenceCrawler{
 	crawlers.NewBinanceCrawler(),
 	crawlers.NewLiquidCrawler(),
 	crawlers.NewBitfinexCrawler(),
@@ -34,8 +34,7 @@ func main() {
 	processor := mapreduce.NewMapReduceProcessor(directory, quotedCurrency, publishedPrices)
 	processor.Initialize()
 
-	// Start the server locally
-	log.Println("http server started on :8080")
+	// handler := cors.Default().Handler(mux)
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
