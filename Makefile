@@ -7,9 +7,9 @@ COMMIT := $(shell git log -1 --format='%H')
 
 export GO111MODULE = on
 
-ldflags = -X aquarelle-tech/darkmatter/version.Name=DarkMatterServer \
-	-X aquarelle-tech/darkmatter/version.Version=$(VERSION) \
-	-X aquarelle-tech/darkmatter/version.Commit=$(COMMIT)"
+ldflags = -X github.com/aquarelle-tech/darkmatter/version.Name=DarkMatterServer \
+	-X github.com/aquarelle-tech/darkmatter/version.Version=$(VERSION) \
+	-X github.com/aquarelle-tech/darkmatter/version.Commit=$(COMMIT)"
 
 BUILD_FLAGS := -ldflags '$(ldflags)'
 

@@ -16,7 +16,20 @@ const (
 	ServiceHash = "1d0684170dcf58ed2499d233be72b5dde48d8124cb617f1309bae85da2fe85cf"
 
 	BLOCK_HASH_PREFIX = "dd"
+
+	V1_BLOCK_VERSION = "1.0.0"
 )
+
+// A KV pair storage manager definition
+type KVStore interface {
+	StoreValue(key string, value []byte) error
+	GetValue(key string) ([]byte, error)
+
+	StoreBlock(block FullSignedBlock) error
+	GetBlock(hash string) (*FullSignedBlock, error)
+	FindBlockByTimestamp(timestamp uint64) (*FullSignedBlock, error)
+	FindBlockByHeight(Height uint64) (*FullSignedBlock, error)
+}
 
 // The model used to get the data
 type QuotePriceInfo struct {
@@ -53,11 +66,11 @@ func (info QuotePriceInfo) String() string {
 // Message used to be send to users and index the blocks
 type LiteIndexValueMessage struct {
 	Hash          string  `json:"hash"`
-	Height        int64   `json:"height"`
+	Height        uint64  `json:"height"`
 	PriceIndex    float64 `json:"priceIndex"`
 	Quoted        string  `json:"quote"`
 	NodeAddress   string  `json:"nodeAddress"`
-	Timestamp     int64   `json:"timestamp"`
+	Timestamp     uint64  `json:"timestamp"`
 	Confirmations int     `json:"confirmations"`
 }
 
@@ -65,8 +78,9 @@ type LiteIndexValueMessage struct {
 // Message to send to the connected clients through websocket
 type FullSignedBlock struct {
 	Hash      string `json:"hash"`
-	Height    int64  `json:"height"`
-	Timestamp int64  `json:"timestamp"`
+	Height    uint64 `json:"height"`
+	Timestamp uint64 `json:"timestamp"`
+	Version   string `json:"version"`
 
 	AveragePrice    float64  `json:"avgPrice"`
 	AverageVolume   float64  `json:"avgVolumen"`
@@ -74,6 +88,7 @@ type FullSignedBlock struct {
 	PreviousHash    string   `json:"previousHash"`
 	Address         string   `json:"address"`
 	PreviousAddress string   `json:"previousAddress"`
+	Memo            string   `json:"memo"`
 	Evidence        []Result `json:"evidence"`
 }
 
@@ -88,7 +103,7 @@ func (block *FullSignedBlock) CreateHash() error {
 	}
 
 	// The hashes for the block has attached a prefix and the the number of seconds taken from the timestamp
-	seconds := time.Unix(block.Timestamp, 0).Second()
+	seconds := time.Unix(int64(block.Timestamp), 0).Second()
 	block.Hash = fmt.Sprintf("%s%02d%s", BLOCK_HASH_PREFIX, seconds, block.Hash)
 
 	return err // No error

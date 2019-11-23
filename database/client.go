@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"aquarelle-tech/darkmatter/types"
+	"github.com/aquarelle-tech/darkmatter/types"
 )
 
 const (
@@ -21,18 +21,26 @@ const (
 
 	// Full filename (including path) for the file where the latest block is stored
 	LatestBlockFileName = RootDataDir + "/latest-block.json"
+
+	StorFileLocation = "/chain/stor"
+	LatestBlockKey = "latest"
 )
 
 type BlockChain struct {
 	latestBlock *types.FullSignedBlock
+	kvstore types.KVStore
+}
+
+func (db *BlockChain) InitializeBlockchain() {
+
 }
 
 // Creates a new signed block to store
-func (db *BlockChain) NewFullSignedBlock(ticker string, avgPrice float64, avgVolumen float64, sources []types.Result) types.FullSignedBlock {
+func (db *BlockChain) NewFullSignedBlock(ticker string, avgPrice float64, avgVolumen float64, sources []types.Result, memo string) types.FullSignedBlock {
 
 	// Create a "protomessage" in order to be hashed with the hash inside
 	var latestHash string
-	var height int64
+	var height uint64
 
 	if db.latestBlock == nil { // try to get the stored block
 		db.ReadLatestBlock()
@@ -46,11 +54,13 @@ func (db *BlockChain) NewFullSignedBlock(ticker string, avgPrice float64, avgVol
 	block := types.FullSignedBlock{
 		Height:        height,
 		AveragePrice:  avgVolumen,
+		Version:       types.V1_BLOCK_VERSION,
 		AverageVolume: avgPrice,
 		Ticker:        ticker,
-		Timestamp:     time.Now().Unix(),
+		Timestamp:     uint64(time.Now().Unix()),
 		PreviousHash:  latestHash, // Chain the current hash with the previous one
 		Evidence:      sources,
+		Memo:          memo,
 	}
 	// Other settings
 	block.CreateHash()
@@ -58,21 +68,49 @@ func (db *BlockChain) NewFullSignedBlock(ticker string, avgPrice float64, avgVol
 		block.PreviousAddress = db.latestBlock.Address // Link with previous block
 	}
 
-	db.StoreBlock(&block)
+	db.kvstore.StoreBlock(block)
 	// Latest block
 	db.latestBlock = &block
-	db.StoreLatestBlock()
+	bytes, err := json.Marshal(block)
+	if err != nil {
+		panic (err) //TODO: This error is important!! means that there was not able to create a new block! Needs more code to manage this event
+	}
+	db.kvstore.StoreValue(LatestBlockKey, bytes)
 
 	log.Println("Created a new block", block)
 	return block
 }
 
+
+func (db *BlockChain) GetBlockByHash(hash string) (*types.FullSignedBlock, error) {
+
+	return nil, nil
+}
+
+
+// Return a block from a weight value
+func (db *BlockChain) GetBlockByWeight(weight int64) (*types.FullSignedBlock, error) {
+	return nil, nil
+}
+
+// Return a block from a timestamp value
+func (db *BlockChain) GetBlockByTimestamp(timestamp int64) (*types.FullSignedBlock, error) {
+
+	return nil, nil
+}
+
+// Return a block from a timestamp value
+func (db *BlockChain) GetMany(startingTimestamp int64, previousCount int) ([]types.FullSignedBlock, error) {
+
+	return nil, nil
+}
+
 // Store a block inside the public repository
-func (db *BlockChain) StoreBlock(block *types.FullSignedBlock) {
+func (db *BlockChain) StoreBlockOnFileSystem(block *types.FullSignedBlock) {
 
 	CheckRootDir()
 
-	t := time.Unix(block.Timestamp, 0)
+	t := time.Unix(int64(block.Timestamp), 0)
 	// The full path where to store the block
 	repositoryPath := fmt.Sprintf("%s/%d/%d/%d/%d/%d", BlocksDataDir, t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute())
 	// Use the hash to name the filename

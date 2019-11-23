@@ -11,7 +11,7 @@ import (
 
 	"path/filepath"
 
-	"aquarelle-tech/darkmatter/types"
+	"github.com/aquarelle-tech/darkmatter/types"
 	"github.com/gorilla/websocket"
 )
 

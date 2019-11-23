@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"aquarelle-tech/darkmatter/database"
-	"aquarelle-tech/darkmatter/types"
+	"github.com/aquarelle-tech/darkmatter/database"
+	"github.com/aquarelle-tech/darkmatter/types"
 )
 
 const (
@@ -116,6 +116,7 @@ func (p Processor) reduceJobs(poolSize int) {
 		totalPrice,  // Average price
 		totalVolume, // High price
 		sources,
+		"", // TODO: Add the memo info, if any
 	)
 
 	p.PublicationChan <- newMsg

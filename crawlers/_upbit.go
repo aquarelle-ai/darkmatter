@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"aquarelle-tech/darkmatter/types"
+	"github.com/aquarelle-tech/darkmatter/types"
 )
 
 const (

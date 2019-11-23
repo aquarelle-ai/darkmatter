@@ -7,10 +7,10 @@ import (
 	"log"
 	"net/http"
 
-	"aquarelle-tech/darkmatter/crawlers"
-	"aquarelle-tech/darkmatter/mapreduce"
-	"aquarelle-tech/darkmatter/service"
-	"aquarelle-tech/darkmatter/types"
+	"github.com/aquarelle-tech/darkmatter/crawlers"
+	"github.com/aquarelle-tech/darkmatter/mapreduce"
+	"github.com/aquarelle-tech/darkmatter/service"
+	"github.com/aquarelle-tech/darkmatter/types"
 )
 
 // List of available crawlers
