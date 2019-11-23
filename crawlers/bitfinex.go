@@ -85,6 +85,6 @@ func (c BitfinexCrawler) Crawl(quotedCurrency string, done chan types.QuotePrice
 
 	priceInfo := c.ToQuotePriceInfo(jsonData)
 	priceInfo.Timestamp = time.Now().Unix()
-	priceInfo.DataUrl = BITFINEX_APIURL
+	priceInfo.DataURL = BITFINEX_APIURL
 	done <- priceInfo
 }

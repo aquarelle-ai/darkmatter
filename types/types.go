@@ -1,6 +1,4 @@
-/**
- ** Copyright 2019 by Cratos Network, a project from Aquarelle AI
-**/
+// Package types
 package types
 
 import (
@@ -13,25 +11,24 @@ import (
 )
 
 const (
+	// ServiceHash is a random number to be included in all the signs to enforce the hashes creation
 	ServiceHash = "1d0684170dcf58ed2499d233be72b5dde48d8124cb617f1309bae85da2fe85cf"
 
-	BLOCK_HASH_PREFIX = "dd"
-
-	V1_BLOCK_VERSION = "1.0.0"
+	// BlockHashPrefix is the standard prefix used in DarkMatter protocol to recognize their blocks hashes
+	BlockHashPrefix = "dd"
 )
 
-// A KV pair storage manager definition
+// KVStore defines a KV pair storage manager definition
 type KVStore interface {
 	StoreValue(key string, value []byte) error
 	GetValue(key string) ([]byte, error)
-
 	StoreBlock(block FullSignedBlock) error
 	GetBlock(hash string) (*FullSignedBlock, error)
 	FindBlockByTimestamp(timestamp uint64) (*FullSignedBlock, error)
 	FindBlockByHeight(Height uint64) (*FullSignedBlock, error)
 }
 
-// The model used to get the data
+// QuotePriceInfo is the model used to get the data
 type QuotePriceInfo struct {
 	// Symbol string `json:"symbol"`
 	// PriceChange        float32 `json:"priceChange"`
@@ -47,7 +44,7 @@ type QuotePriceInfo struct {
 	HighPrice   float64 `json:"highPrice"`
 	OpenPrice   float64 `json:"openPrice"`
 	Timestamp   int64   `json:"timestamp"`
-	DataUrl     string  `json:"dataUrl"`
+	DataURL     string  `json:"dataUrl"`
 	// LowPrice           float64 `json:"lowPrice"`
 	// OpenTime           int64  `json:"openTime"`
 	// CloseTime          int64  `json:"closeTime"`
@@ -63,7 +60,7 @@ func (info QuotePriceInfo) String() string {
 	return string(result)
 }
 
-// Message used to be send to users and index the blocks
+// LiteIndexValueMessage is the message model used to be send to users and index the blocks
 type LiteIndexValueMessage struct {
 	Hash          string  `json:"hash"`
 	Height        uint64  `json:"height"`
@@ -74,13 +71,11 @@ type LiteIndexValueMessage struct {
 	Confirmations int     `json:"confirmations"`
 }
 
-/**************   Service´s Public Messages ******************/
-// Message to send to the connected clients through websocket
+// FullSignedBlock is the message to send to the connected clients through websocket
 type FullSignedBlock struct {
 	Hash      string `json:"hash"`
 	Height    uint64 `json:"height"`
 	Timestamp uint64 `json:"timestamp"`
-	Version   string `json:"version"`
 
 	AveragePrice    float64  `json:"avgPrice"`
 	AverageVolume   float64  `json:"avgVolumen"`
@@ -92,7 +87,7 @@ type FullSignedBlock struct {
 	Evidence        []Result `json:"evidence"`
 }
 
-// Calculate the hash for a block
+// CreateHash calculates the hash for a block
 func (block *FullSignedBlock) CreateHash() error {
 
 	// create a hash the result
@@ -104,7 +99,7 @@ func (block *FullSignedBlock) CreateHash() error {
 
 	// The hashes for the block has attached a prefix and the the number of seconds taken from the timestamp
 	seconds := time.Unix(int64(block.Timestamp), 0).Second()
-	block.Hash = fmt.Sprintf("%s%02d%s", BLOCK_HASH_PREFIX, seconds, block.Hash)
+	block.Hash = fmt.Sprintf("%s%02d%s", BlockHashPrefix, seconds, block.Hash)
 
 	return err // No error
 }
@@ -119,14 +114,13 @@ func (block FullSignedBlock) String() string {
 	return string(bytes)
 }
 
-/**************** Map & Reduce types ***************************/
-// The job message to insert in a queue to be processed as part of the the Mapping Stage
+// GetDataJob is the job message to insert in a queue to be processed as part of the the Mapping Stage
 type GetDataJob struct {
 	Quote       string
 	DataCrawler PriceEvidenceCrawler
 }
 
-// The result message that will receive the results from the mapped nodes in the Reduce Stage
+// Result is the message that will receive the results from the mapped nodes in the Reduce Stage
 type Result struct {
 	CrawlerName string         `json:"name"`
 	Data        QuotePriceInfo `json:"data"`
@@ -136,7 +130,7 @@ type Result struct {
 	Hash        string         `json:"hash"`
 }
 
-// Create a double hash (sha256(sha256)) for all the content
+// CreateHash creates a double hash (sha256(sha256)) for all the content
 func (result *Result) CreateHash() error {
 	// create a hash the result
 	result.Hash = "" // To asure a clean hash
@@ -149,8 +143,7 @@ func (result *Result) CreateHash() error {
 	return err // No error
 }
 
-/*****  Crawkers types **********************/
-// Interface for clients
+// PriceEvidenceCrawler is the interface for clients
 type PriceEvidenceCrawler interface {
 	Crawl(quotedCurrency string, done chan QuotePriceInfo)
 	GetName() string

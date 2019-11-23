@@ -74,6 +74,6 @@ func (c LiquidCrawler) Crawl(quotedCurrency string, done chan types.QuotePriceIn
 
 	priceInfo := c.ToQuotePriceInfo(jsonData)
 	priceInfo.Timestamp = time.Now().Unix()
-	priceInfo.DataUrl = LIQUID_APIURL
+	priceInfo.DataURL = LIQUID_APIURL
 	done <- priceInfo
 }

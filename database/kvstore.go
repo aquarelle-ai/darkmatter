@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	// Prefix to indentify each key in the datastore
+	// Prefixes indentify each key in the datastore
 	HashKeyPrefix      = 0x1
 	TimestampKeyPrefix = 0x2
 	HeightKeyPrefix    = 0x3
@@ -78,7 +78,7 @@ func readStringIndex (txn *badger.Txn, key string,  prefix byte) ([]byte, error)
 func (s Store) StoreBlock (block types.FullSignedBlock) error {
 
 	// Open badger
-	stor, err := badger.Open(badger.DefaultOptions(StorFileLocation))
+	stor, err := badger.Open(badger.DefaultOptions(s.StorFileLocation))
 	if err != nil {
 		panic(err)
 	}
@@ -183,7 +183,7 @@ func (s Store) FindBlockByHeight (Height uint64) (*types.FullSignedBlock, error)
 }
 
 
-// Store an abritrary value to the database, indexed by a string 
+// StoreValue stores an abritrary value in the database, indexed by a string 
 func (s Store) StoreValue (key string, value []byte) error {
 
 	// Open badger
@@ -201,7 +201,8 @@ func (s Store) StoreValue (key string, value []byte) error {
 	return err
 }
 
-func (s Store) GetValue (key string) ([]byte, error) {
+// GetValue returns a value stored in the database indexed by an string
+func (s *Store) GetValue (key string) ([]byte, error) {
 
 	// Open badger
 	stor, err := badger.Open(badger.DefaultOptions(s.StorFileLocation))

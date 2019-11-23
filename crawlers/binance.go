@@ -84,6 +84,6 @@ func (c BinanceCrawler) Crawl(quotedCurrency string, done chan types.QuotePriceI
 
 	priceInfo := c.ToQuotePriceInfo(jsonData)
 	priceInfo.Timestamp = time.Now().Unix()
-	priceInfo.DataUrl = BINANCE_APIURL
+	priceInfo.DataURL = BINANCE_APIURL
 	done <- priceInfo
 }

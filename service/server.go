@@ -15,10 +15,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const (
-	PUBLIC_DIRECTORY_PATH = "./public"
-)
-
 var clients = make(map[*websocket.Conn]bool)           // connected clients
 var broadcast = make(chan types.LiteIndexValueMessage) // Broadcast channel
 var upgrader = websocket.Upgrader{}
@@ -108,10 +104,7 @@ func (o OracleServer) handlePriceListeners(w http.ResponseWriter, r *http.Reques
 func serveChain(w http.ResponseWriter, r *http.Request) {
 	setupResponse(&w, r)
 
-	println("Llegando a solicitar  un fichero")
 	path := filepath.Join("public", filepath.Clean(r.URL.Path))
-
-	println(path)
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		println("El fichero no existe")

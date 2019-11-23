@@ -1,6 +1,8 @@
 /**
  ** Copyright 2019 by Cratos Network, a project from Aquarelle AI
 **/
+
+// Package mapreduce
 package mapreduce
 
 import (
@@ -14,9 +16,14 @@ import (
 const (
 	// How many seconds between a call and another one
 	DELAY_BETWEEN_CRAWLS = 2 * time.Second
+
+	// BlockchainFileLocation is the directory where to store the database for the node
+	BlockchainFileLocation = "./chain/stor"
+	MainBlockChainName     = "main"
 )
 
-var publicBlockDatabase database.BlockChain = database.BlockChain{}
+// PublicBlockDatabase is the main instance to manage the database
+var PublicBlockDatabase *database.BlockChain = database.NewBlockChain(MainBlockChainName, BlockchainFileLocation)
 
 type Processor struct {
 	// Channels to build the worker pool
@@ -111,7 +118,7 @@ func (p Processor) reduceJobs(poolSize int) {
 	//====================================================================================================================
 
 	// Create a message to send to service´s listeners
-	newMsg := publicBlockDatabase.NewFullSignedBlock(
+	newMsg := PublicBlockDatabase.NewFullSignedBlock(
 		ticker,
 		totalPrice,  // Average price
 		totalVolume, // High price
