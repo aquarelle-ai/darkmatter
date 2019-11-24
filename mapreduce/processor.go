@@ -14,16 +14,9 @@ import (
 )
 
 const (
-	// How many seconds between a call and another one
-	DELAY_BETWEEN_CRAWLS = 2 * time.Second
-
-	// BlockchainFileLocation is the directory where to store the database for the node
-	BlockchainFileLocation = "./chain/stor"
-	MainBlockChainName     = "main"
+	// DelayBetweenCrawls set how many seconds should wait between a call and another one
+	DelayBetweenCrawls = 2 * time.Second
 )
-
-// PublicBlockDatabase is the main instance to manage the database
-var PublicBlockDatabase *database.BlockChain = database.NewBlockChain(MainBlockChainName, BlockchainFileLocation)
 
 type Processor struct {
 	// Channels to build the worker pool
@@ -35,6 +28,7 @@ type Processor struct {
 	PublicationChan chan types.FullSignedBlock
 }
 
+// is a constructor for a Processor
 func NewMapReduceProcessor(directory []types.PriceEvidenceCrawler, quotedCurrency string, publicationChan chan types.FullSignedBlock) Processor {
 	// Channels to build the worker pool
 	return Processor{
@@ -98,7 +92,7 @@ func (p Processor) allocateJobs(poolSize int) {
 }
 
 // Execute the Reduce stage. Get all the data crawled from the sources and generates an aggregate index
-func (p Processor) reduceJobs(poolSize int) {
+func (p Processor) reduceJobs() {
 	var totalVolume float64
 	// var totalQuoted float64
 	var totalPrice float64
@@ -118,7 +112,7 @@ func (p Processor) reduceJobs(poolSize int) {
 	//====================================================================================================================
 
 	// Create a message to send to service´s listeners
-	newMsg := PublicBlockDatabase.NewFullSignedBlock(
+	newMsg := database.PublicBlockDatabase.NewFullSignedBlock(
 		ticker,
 		totalPrice,  // Average price
 		totalVolume, // High price
@@ -138,11 +132,11 @@ func (p Processor) mapReduceLoop() {
 
 		// Create the jobs an launch the process to create
 		go p.allocateJobs(poolSize)
-		go p.reduceJobs(poolSize)
+		go p.reduceJobs()
 
 		p.createWorkerPool(poolSize)
 		// and wait to request a new block of daya
-		time.Sleep(DELAY_BETWEEN_CRAWLS)
+		time.Sleep(DelayBetweenCrawls)
 	}
 }
 

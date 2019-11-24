@@ -45,6 +45,7 @@ type QuotePriceInfo struct {
 	OpenPrice   float64 `json:"openPrice"`
 	Timestamp   int64   `json:"timestamp"`
 	DataURL     string  `json:"dataUrl"`
+	ExchangeUID string  `json:"provider"`
 	// LowPrice           float64 `json:"lowPrice"`
 	// OpenTime           int64  `json:"openTime"`
 	// CloseTime          int64  `json:"closeTime"`

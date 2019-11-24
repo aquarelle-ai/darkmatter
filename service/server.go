@@ -4,20 +4,33 @@
 package service
 
 import (
-	"io/ioutil"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
-	"os"
+	"strconv"
 
-	"path/filepath"
-
+	"github.com/aquarelle-tech/darkmatter/database"
 	"github.com/aquarelle-tech/darkmatter/types"
 	"github.com/gorilla/websocket"
 )
 
-var clients = make(map[*websocket.Conn]bool)           // connected clients
-var broadcast = make(chan types.LiteIndexValueMessage) // Broadcast channel
-var upgrader = websocket.Upgrader{}
+const (
+	APIVersion = "v1"
+)
+
+var (
+	clients   = make(map[*websocket.Conn]bool)         // connected clients
+	broadcast = make(chan types.LiteIndexValueMessage) // Broadcast channel
+	upgrader  = websocket.Upgrader{}
+)
+
+// Error represents a handler error. It provides methods for a HTTP status
+// code and embeds the built-in error interface.
+type Error interface {
+	error
+	Status() int
+}
 
 type OracleServer struct {
 	// Channel to se
@@ -58,6 +71,69 @@ func setupResponse(w *http.ResponseWriter, req *http.Request) {
 	(*w).Header().Set("Access-Control-Allow-Origin", "*")
 	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+}
+
+func (o OracleServer) getBlock(w http.ResponseWriter, r *http.Request) {
+
+	setupResponse(&w, r)
+	if r.Method != "GET" {
+		errorMsg := fmt.Sprintf("HTTP Error: Invalid method '%s'", r.Method)
+		log.Println(errorMsg)
+		http.Error(w, errorMsg, http.StatusNotAcceptable)
+		return
+	}
+
+	hash := r.URL.Query().Get("hash")
+	timestampParam := r.URL.Query().Get("timestamp")
+	heightParam := r.URL.Query().Get("height")
+
+	var block *types.FullSignedBlock
+	var err error
+
+	if len(hash) == 0 && len(timestampParam) == 0 && len(heightParam) == 0 {
+		errorMsg := "Can´t find an acceptable parameter to look for a block"
+		log.Printf("HTTP Error: %s", errorMsg)
+		http.Error(w, errorMsg, http.StatusBadRequest)
+		return
+	}
+
+	if len(hash) != 0 { // If there is a hash...
+		block, err = database.PublicBlockDatabase.Store.GetBlock(hash)
+		if err != nil {
+			errorMsg := fmt.Sprintf("Don´t exists a block for the hash '%s'", hash)
+			log.Printf("HTTP Error: %s", errorMsg)
+			http.Error(w, errorMsg, http.StatusNotFound)
+			return
+		}
+	} else if len(timestampParam) > 0 { // if there is a timestamp
+		timestamp, err := strconv.ParseUint(timestampParam, 10, 64)
+		if err != nil {
+			errorMsg := fmt.Sprintf("Invalid value '%s' for the timestamp.", timestampParam)
+			log.Printf("HTTP Error: %s", errorMsg)
+			http.Error(w, errorMsg, http.StatusBadRequest)
+			return
+		}
+		block, err = database.PublicBlockDatabase.Store.FindBlockByTimestamp(timestamp)
+	} else if len(heightParam) > 0 { // if there is a height
+		height, err := strconv.ParseUint(heightParam, 10, 64)
+		if err != nil {
+			errorMsg := fmt.Sprintf("Invalid value '%s' for the height", heightParam)
+			log.Printf("HTTP Error: %s", errorMsg)
+			http.Error(w, errorMsg, http.StatusBadRequest)
+			return
+		}
+		block, err = database.PublicBlockDatabase.Store.FindBlockByHeight(height)
+	}
+
+	response, err := json.MarshalIndent(block, "", " ")
+	if err != nil {
+		errorMsg := "The stored block information is corrupted. Please check this error with the node manager"
+		log.Printf("HTTP Error: %s", errorMsg)
+		http.Error(w, errorMsg, http.StatusNotAcceptable)
+		return
+	}
+
+	w.Write(response)
 }
 
 // This function will receive and register all the new listeners
@@ -101,40 +177,14 @@ func (o OracleServer) handlePriceListeners(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-func serveChain(w http.ResponseWriter, r *http.Request) {
-	setupResponse(&w, r)
-
-	path := filepath.Join("public", filepath.Clean(r.URL.Path))
-
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		println("El fichero no existe")
-
-		//log.Fatal((err))
-
-		http.Error(w, "The requested block doesn´t exists.", http.StatusInternalServerError)
-
-	} else {
-		println("Intentando leer el fichero")
-		blockContent, err := ioutil.ReadFile(path)
-		if err == nil {
-			// Send the blockContent
-			w.Write([]byte(blockContent))
-
-		} else {
-			// log.Fatal((err))
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		}
-	}
-}
-
 // Prepare and start the main routines
 func (o OracleServer) Initialize() {
-	// To send back a html page by default
-	// fs := http.FileServer(http.Dir(PUBLIC_DIRECTORY_PATH))
-	http.HandleFunc("/", serveChain)
 
 	// The main route to get the websocket path
-	http.HandleFunc("/price", o.handlePriceListeners)
+	http.HandleFunc(fmt.Sprintf("/%s/socket/latest", APIVersion), o.handlePriceListeners)
+
+	// The main route to get the websocket path
+	http.HandleFunc(fmt.Sprintf("/%s/chain", APIVersion), o.getBlock)
 
 	// Launch subrouting to handle messages
 	go o.broadcastMessages()

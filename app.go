@@ -35,7 +35,7 @@ func main() {
 	processor.Initialize()
 
 	// handler := cors.Default().Handler(mux)
-	err := http.ListenAndServe(":8080", nil)
+	err := http.ListenAndServe(":6877", nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
