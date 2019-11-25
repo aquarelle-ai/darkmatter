@@ -35,7 +35,7 @@ func NewLiquidCrawler() LiquidCrawler {
 
 // Return the name of this crawler
 func (c LiquidCrawler) GetName() string {
-	return c.Ticker
+	return LIQUID_MODULE_NAME
 }
 
 func (c LiquidCrawler) GetTicker() string {

@@ -130,6 +130,57 @@ func (s Store) GetBlock(hash string) (*types.FullSignedBlock, error) {
 	return &block, err
 }
 
+// GetLatestBlocks returns n blocks starting in the specified timeouts. The algorithm will iterate over
+// the database looking for stored timestamps lower or equal to the parameter.
+func (s Store) GetLatestBlocks(timestamp uint64, n int) ([]types.FullSignedBlock, error) {
+
+	var blocks []types.FullSignedBlock
+
+	err := s.storHandler.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchSize = 10
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		var hashes []string
+		for it.Rewind(); it.Valid(); it.Next() {
+			// Check when the list of hashes is full
+			if len(hashes) == n {
+				break
+			}
+			item := it.Item()
+			k := item.Key()
+
+			if k[0] == TimestampKeyPrefix { // Check only the timestamp indexes
+				storedTimestamp := binary.LittleEndian.Uint64((k[1:]))
+				if storedTimestamp <= timestamp {
+					// Get the value
+					value, err := item.ValueCopy(nil)
+					if err != nil {
+						return err
+					}
+					hashes = append(hashes, string(value))
+				}
+			}
+		}
+		// there are n hashes, get the blocks
+		for i := 0; i < n; i++ {
+
+			var block types.FullSignedBlock
+			bytes, err := readStringIndex(txn, hashes[i], HashKeyPrefix)
+			if err != nil {
+				return err
+			}
+			err = json.Unmarshal(bytes, &block)
+			blocks = append(blocks, block)
+		}
+
+		return nil
+	})
+
+	return blocks, err
+}
+
 // Read a block from the database using their timestamp as index
 func (s Store) FindBlockByTimestamp(timestamp uint64) (*types.FullSignedBlock, error) {
 

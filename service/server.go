@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/aquarelle-tech/darkmatter/database"
 	"github.com/aquarelle-tech/darkmatter/types"
@@ -67,19 +68,47 @@ func (o OracleServer) broadcastMessages() {
 	}
 }
 
+// setupResponse initialize the headers in each request
 func setupResponse(w *http.ResponseWriter, req *http.Request) {
 	(*w).Header().Set("Access-Control-Allow-Origin", "*")
 	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 }
 
-func (o OracleServer) getBlock(w http.ResponseWriter, r *http.Request) {
-
-	setupResponse(&w, r)
+func checkGETOnly(w http.ResponseWriter, r *http.Request) bool {
 	if r.Method != "GET" {
 		errorMsg := fmt.Sprintf("HTTP Error: Invalid method '%s'", r.Method)
 		log.Println(errorMsg)
 		http.Error(w, errorMsg, http.StatusNotAcceptable)
+		return false
+	}
+
+	return true
+}
+
+// getLatestBlocks returns the latest 10 blocks
+func (o OracleServer) getLatestBlocks(w http.ResponseWriter, r *http.Request) {
+	setupResponse(&w, r)
+	if !checkGETOnly(w, r) {
+		return
+	}
+	// Return the latest blocks, starting now
+	blocks, err := database.PublicBlockDatabase.Store.GetLatestBlocks(uint64(time.Now().Unix()), 10)
+	if err != nil {
+		errorMsg := "The server can´t recover the requested blocks"
+		log.Printf("HTTP Error: %s. Reason: %s", errorMsg, err)
+		http.Error(w, errorMsg, http.StatusInternalServerError)
+		return
+	}
+	response, err := json.Marshal(blocks)
+
+	w.Write(response)
+}
+
+func (o OracleServer) getBlock(w http.ResponseWriter, r *http.Request) {
+
+	setupResponse(&w, r)
+	if !checkGETOnly(w, r) {
 		return
 	}
 
@@ -137,7 +166,7 @@ func (o OracleServer) getBlock(w http.ResponseWriter, r *http.Request) {
 }
 
 // This function will receive and register all the new listeners
-func (o OracleServer) handlePriceListeners(w http.ResponseWriter, r *http.Request) {
+func (o OracleServer) handleWebSocketConnections(w http.ResponseWriter, r *http.Request) {
 
 	setupResponse(&w, r)
 	if (*r).Method == "OPTIONS" {
@@ -180,11 +209,9 @@ func (o OracleServer) handlePriceListeners(w http.ResponseWriter, r *http.Reques
 // Prepare and start the main routines
 func (o OracleServer) Initialize() {
 
-	// The main route to get the websocket path
-	http.HandleFunc(fmt.Sprintf("/%s/socket/latest", APIVersion), o.handlePriceListeners)
-
-	// The main route to get the websocket path
+	http.HandleFunc(fmt.Sprintf("/%s/socket/latest", APIVersion), o.handleWebSocketConnections)
 	http.HandleFunc(fmt.Sprintf("/%s/chain", APIVersion), o.getBlock)
+	http.HandleFunc(fmt.Sprintf("/%s/latest", APIVersion), o.getLatestBlocks)
 
 	// Launch subrouting to handle messages
 	go o.broadcastMessages()

@@ -13,19 +13,35 @@ import (
 const (
 	// ServiceHash is a random number to be included in all the signs to enforce the hashes creation
 	ServiceHash = "1d0684170dcf58ed2499d233be72b5dde48d8124cb617f1309bae85da2fe85cf"
-
 	// BlockHashPrefix is the standard prefix used in DarkMatter protocol to recognize their blocks hashes
 	BlockHashPrefix = "dd"
 )
 
 // KVStore defines a KV pair storage manager definition
 type KVStore interface {
-	StoreValue(key string, value []byte) error
+	StoreValue(key string, value []byte) error // StoreValue saves a unespecified instance using an string as key
 	GetValue(key string) ([]byte, error)
 	StoreBlock(block FullSignedBlock) error
 	GetBlock(hash string) (*FullSignedBlock, error)
+	GetLatestBlocks(timestamp uint64, n int) ([]FullSignedBlock, error)
 	FindBlockByTimestamp(timestamp uint64) (*FullSignedBlock, error)
 	FindBlockByHeight(Height uint64) (*FullSignedBlock, error)
+}
+
+// ExchangeMarketMessage holds the order book price and quantity depth updates for any exchange. Used to unify
+// the events in different exchanges
+type ExchangeMarketEvent struct {
+	ExchangeName  string     `json:"exchangeName"`
+	Symbol        string     `json:"symbol"`
+	FirstUpdateID int64      `json:"firstUpdateId"` // First update ID in event
+	LastUpdateID  int64      `json:"lastUpdateId"`  // Final update ID in event
+	Bids          [][]string `json:"bids"`          // Bids to be updated
+	Asks          [][]string `json:"asks"`          // Asks to be updated
+}
+
+// String implements the Stringer interface
+func (e ExchangeMarketEvent) String() string {
+	return fmt.Sprintf("%s (%s): firstUpdateID:%d, lastUpdateID:%d ", e.ExchangeName, e.Symbol, e.FirstUpdateID, e.LastUpdateID)
 }
 
 // QuotePriceInfo is the model used to get the data
