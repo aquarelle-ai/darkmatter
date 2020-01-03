@@ -1,5 +1,5 @@
 /**
- ** Copyright 2019 by Cratos Network, a project from Aquarelle AI
+ ** Copyright 2019 by Cratos Network, a project from Aquarelle Tech
 **/
 package crawlers
 
@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/aquarelle-tech/darkmatter/types"
+	"../types"
 )
 
 const (
@@ -18,13 +18,13 @@ const (
 
 // The REST API client to get data from Bitfinex
 type BitfinexCrawler struct {
-	DataCrawler Crawler
+	DataCrawler types.Crawler
 	Ticker      string
 }
 
 // Creates a new crawler
 func NewBitfinexCrawler() BitfinexCrawler {
-	crawler := NewCrawler(BITFINEX_APIURL)
+	crawler := types.NewCrawler(BITFINEX_APIURL)
 
 	return BitfinexCrawler{
 		DataCrawler: crawler,

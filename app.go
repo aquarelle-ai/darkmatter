@@ -1,20 +1,27 @@
 /**
- ** Copyright 2019 by Cratos Network, a project from Aquarelle AI
+ ** Copyright 2019 by Cratos Network, a project from Aquarelle Tech
 **/
 package main
 
 import (
+	// "encoding/binary"
+	// "fmt"
+
 	"log"
 	"net/http"
 
-	"github.com/aquarelle-tech/darkmatter/crawlers"
 	"github.com/aquarelle-tech/darkmatter/mapreduce"
 	"github.com/aquarelle-tech/darkmatter/service"
+
+	"github.com/aquarelle-tech/darkmatter/x/cryptocerts/crawlers"
+	cryptocerts "github.com/aquarelle-tech/darkmatter/x/cryptocerts/types"
+
+	// "github.com/aquarelle-tech/darkmatter/shamir"
 	"github.com/aquarelle-tech/darkmatter/types"
 )
 
 // List of available crawlers
-var directory = []types.PriceEvidenceCrawler{
+var directory = []cryptocerts.PriceEvidenceCrawler{
 	crawlers.NewBinanceCrawler(),
 	crawlers.NewLiquidCrawler(),
 	crawlers.NewBitfinexCrawler(),
@@ -23,6 +30,20 @@ var directory = []types.PriceEvidenceCrawler{
 var publishedPrices = make(chan types.FullSignedBlock)
 
 func main() {
+
+	// s := uint64(123456)
+
+	// buf := make([]byte, 8)
+	// binary.LittleEndian.PutUint64(buf, s)
+	// fmt.Printf("buf=%d\n", buf)
+
+	// result, _ := shamir.Split(buf, 5, 3)
+	// fmt.Printf("result=%d\n", result)
+
+	// bytes, _ := shamir.Combine(result)
+	// fmt.Printf("bytes=%d\n", bytes)
+
+	// fmt.Println(binary.LittleEndian.Uint64(bytes))
 
 	quotedCurrency := "USD"
 

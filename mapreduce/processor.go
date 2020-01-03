@@ -1,5 +1,5 @@
 /**
- ** Copyright 2019 by Cratos Network, a project from Aquarelle AI
+ ** Copyright 2019 by Cratos Network, a project from Aquarelle Tech
 **/
 
 // Package mapreduce
