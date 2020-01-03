@@ -1,13 +1,14 @@
 /**
- ** Copyright 2019 by Cratos Network, a project from Aquarelle AI
+ ** Copyright 2019 by Cratos Network, a project from Aquarelle Tech
 **/
-package crawlers
+package types
 
 import (
 	"io/ioutil"
 	"net/http"
 )
 
+// Crawler is a general interface for all the crawlers
 type Crawler struct {
 	Url     string
 	Headers map[string]string

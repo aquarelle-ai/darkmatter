@@ -44,7 +44,8 @@ func NewBlockChain(name string, locationDirectory string) *BlockChain {
 }
 
 // NewFullSignedBlock creates a new signed block to store
-func (db *BlockChain) NewFullSignedBlock(ticker string, avgPrice float64, avgVolumen float64, sources []types.Result, memo string) types.FullSignedBlock {
+func (db *BlockChain) NewFullSignedBlock(data interface{}, sources []types.Result, memo string) types.FullSignedBlock {
+	//  func (db *BlockChain) NewFullSignedBlock(ticker string, avgPrice float64, avgVolumen float64, sources []types.Result, memo string) types.FullSignedBlock {
 
 	// Create a "protomessage" in order to be hashed with the hash inside
 	var latestHash string
@@ -60,14 +61,15 @@ func (db *BlockChain) NewFullSignedBlock(ticker string, avgPrice float64, avgVol
 	}
 
 	block := types.FullSignedBlock{
-		Height:        height,
-		AveragePrice:  avgVolumen,
-		AverageVolume: avgPrice,
-		Ticker:        ticker,
-		Timestamp:     uint64(time.Now().Unix()),
-		PreviousHash:  latestHash, // Chain the current hash with the previous one
-		Evidence:      sources,
-		Memo:          memo,
+		Height: height,
+		// AveragePrice:  avgVolumen,
+		// AverageVolume: avgPrice,
+		// Ticker:        ticker,
+		Payload:      data,
+		Timestamp:    uint64(time.Now().Unix()),
+		PreviousHash: latestHash, // Chain the current hash with the previous one
+		Evidence:     sources,
+		Memo:         memo,
 	}
 	// Other settings
 	block.CreateHash()

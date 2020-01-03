@@ -1,5 +1,5 @@
 /**
- ** Copyright 2019 by Cratos Network, a project from Aquarelle AI
+ ** Copyright 2019 by Cratos Network, a project from Aquarelle Tech
 **/
 
 // Package mapreduce
@@ -15,7 +15,7 @@ import (
 
 const (
 	// DelayBetweenCrawls set how many seconds should wait between a call and another one
-	DelayBetweenCrawls = 2 * time.Second
+	DelayBetweenCrawls = 5 * time.Second
 )
 
 type Processor struct {
