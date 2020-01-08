@@ -13,6 +13,7 @@ import (
 
 	"github.com/aquarelle-tech/darkmatter/database"
 	"github.com/aquarelle-tech/darkmatter/types"
+	"github.com/golang/glog"
 	"github.com/gorilla/websocket"
 )
 
@@ -21,9 +22,11 @@ const (
 )
 
 var (
-	clients   = make(map[*websocket.Conn]bool)         // connected clients
-	broadcast = make(chan types.LiteIndexValueMessage) // Broadcast channel
-	upgrader  = websocket.Upgrader{}
+	// ServerInstance keeps the instance of current server
+	ServerInstance *OracleServer
+
+	clients  = make(map[*websocket.Conn]bool) // connected clients
+	upgrader = websocket.Upgrader{}
 )
 
 // Error represents a handler error. It provides methods for a HTTP status
@@ -33,22 +36,65 @@ type Error interface {
 	Status() int
 }
 
+// OracleServer is the main interface to publish the functions to access the framework
 type OracleServer struct {
 	// Channel to se
-	Published chan types.FullSignedBlock
-	Broadcast chan types.LiteIndexValueMessage
+	Publication chan types.FullSignedBlock
+	// Broadcast chan types.LiteIndexValueMessage
+	Broadcast chan types.FullSignedBlock
 	Clients   map[*websocket.Conn]bool
 }
 
-func NewOracleServer(published chan types.FullSignedBlock) OracleServer {
-	return OracleServer{
-		Published: published,
-		Broadcast: broadcast,
-		Clients:   clients,
+// NewOracleServer is the constructor
+func NewOracleServer() *OracleServer {
+
+	if ServerInstance != nil {
+		return ServerInstance
 	}
+
+	ServerInstance = &OracleServer{
+		Publication: make(chan types.FullSignedBlock),
+		Broadcast:   make(chan types.FullSignedBlock),
+		Clients:     clients,
+	}
+
+	return ServerInstance
 }
 
-// Read from the broadcast channel
+// Initialize will prepare and start the main routines
+func (o OracleServer) Initialize() {
+
+	http.HandleFunc(fmt.Sprintf("/%s/socket/latest", APIVersion), o.handleWebSocketConnections)
+	http.HandleFunc(fmt.Sprintf("/%s/chain", APIVersion), o.getBlock)
+	http.HandleFunc(fmt.Sprintf("/%s/latest", APIVersion), o.getLatestBlocks)
+
+	// Launch subrouting to handle messages
+	go o.broadcastMessages()
+}
+
+// AddBlock is an utility function to add a new block with a payload to the blockchain and broadcast the message to
+// all the active subscribers
+func (o OracleServer) AddBlock(payload interface{}, evidence interface{}) error {
+
+	if ServerInstance == nil {
+		msg := "The server instance has not been initialized."
+		glog.Fatal(msg)
+		panic(msg)
+	}
+
+	block, err := database.PublicBlockDatabase.NewFullSignedBlock(payload, evidence, "") // TODO: Add the memo info, if any
+	if err != nil {
+		glog.Fatalf("The database cannot store a new block. %v", err)
+		panic(err)
+	}
+
+	// Add the message to the broadcast queue
+	o.Publication <- block
+
+	return nil
+}
+
+// broadcastMessages will read from the broadcast channel and send the message to every registered client
 func (o OracleServer) broadcastMessages() {
 	for {
 		// Grab the next message from the broadcast channel
@@ -60,7 +106,7 @@ func (o OracleServer) broadcastMessages() {
 
 			// If client is not longer listening or any other error, the client is removed from the list
 			if err != nil {
-				log.Printf("Error writing to a client: %v", err)
+				glog.Infof("Error writing to a client: %v", err)
 				client.Close()
 				delete(o.Clients, client)
 			}
@@ -96,7 +142,7 @@ func (o OracleServer) getLatestBlocks(w http.ResponseWriter, r *http.Request) {
 	blocks, err := database.PublicBlockDatabase.Store.GetLatestBlocks(uint64(time.Now().Unix()), 10)
 	if err != nil {
 		errorMsg := "The server can´t recover the requested blocks"
-		log.Printf("HTTP Error: %s. Reason: %s", errorMsg, err)
+		glog.Infof("HTTP Error: %s. Reason: %s", errorMsg, err)
 		http.Error(w, errorMsg, http.StatusInternalServerError)
 		return
 	}
@@ -105,6 +151,7 @@ func (o OracleServer) getLatestBlocks(w http.ResponseWriter, r *http.Request) {
 	w.Write(response)
 }
 
+// getBlock will return a block from the blockchain
 func (o OracleServer) getBlock(w http.ResponseWriter, r *http.Request) {
 
 	setupResponse(&w, r)
@@ -121,7 +168,7 @@ func (o OracleServer) getBlock(w http.ResponseWriter, r *http.Request) {
 
 	if len(hash) == 0 && len(timestampParam) == 0 && len(heightParam) == 0 {
 		errorMsg := "Can´t find an acceptable parameter to look for a block"
-		log.Printf("HTTP Error: %s", errorMsg)
+		glog.Infof("HTTP Error: %s", errorMsg)
 		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
@@ -130,7 +177,7 @@ func (o OracleServer) getBlock(w http.ResponseWriter, r *http.Request) {
 		block, err = database.PublicBlockDatabase.Store.GetBlock(hash)
 		if err != nil {
 			errorMsg := fmt.Sprintf("Don´t exists a block for the hash '%s'", hash)
-			log.Printf("HTTP Error: %s", errorMsg)
+			glog.Infof("HTTP Error: %s", errorMsg)
 			http.Error(w, errorMsg, http.StatusNotFound)
 			return
 		}
@@ -138,7 +185,7 @@ func (o OracleServer) getBlock(w http.ResponseWriter, r *http.Request) {
 		timestamp, err := strconv.ParseUint(timestampParam, 10, 64)
 		if err != nil {
 			errorMsg := fmt.Sprintf("Invalid value '%s' for the timestamp.", timestampParam)
-			log.Printf("HTTP Error: %s", errorMsg)
+			glog.Infof("HTTP Error: %s", errorMsg)
 			http.Error(w, errorMsg, http.StatusBadRequest)
 			return
 		}
@@ -147,7 +194,7 @@ func (o OracleServer) getBlock(w http.ResponseWriter, r *http.Request) {
 		height, err := strconv.ParseUint(heightParam, 10, 64)
 		if err != nil {
 			errorMsg := fmt.Sprintf("Invalid value '%s' for the height", heightParam)
-			log.Printf("HTTP Error: %s", errorMsg)
+			glog.Infof("HTTP Error: %s", errorMsg)
 			http.Error(w, errorMsg, http.StatusBadRequest)
 			return
 		}
@@ -157,7 +204,7 @@ func (o OracleServer) getBlock(w http.ResponseWriter, r *http.Request) {
 	response, err := json.MarshalIndent(block, "", " ")
 	if err != nil {
 		errorMsg := "The stored block information is corrupted. Please check this error with the node manager"
-		log.Printf("HTTP Error: %s", errorMsg)
+		glog.Infof("HTTP Error: %s", errorMsg)
 		http.Error(w, errorMsg, http.StatusNotAcceptable)
 		return
 	}
@@ -165,7 +212,7 @@ func (o OracleServer) getBlock(w http.ResponseWriter, r *http.Request) {
 	w.Write(response)
 }
 
-// This function will receive and register all the new listeners
+// handleWebSocketConnections will receive and register all the new listeners
 func (o OracleServer) handleWebSocketConnections(w http.ResponseWriter, r *http.Request) {
 
 	setupResponse(&w, r)
@@ -186,33 +233,12 @@ func (o OracleServer) handleWebSocketConnections(w http.ResponseWriter, r *http.
 	// Register a new listener
 	o.Clients[ws] = true
 
-	// An infinite loop to get the published messages from the data processors ad send to the broadcast queue
+	// An infinite loop to get the published messages from the data processors and send to the broadcast queue
 	for {
-		msg := <-o.Published // Get a message from the public queue
-		log.Printf("MESSAGE: Volume=%f, HighPrice=%f", msg.AverageVolume, msg.AveragePrice)
-
-		liteMessage := types.LiteIndexValueMessage{
-			Hash:          msg.Hash,
-			Height:        msg.Height,
-			PriceIndex:    msg.AveragePrice,
-			Quoted:        msg.Ticker,
-			NodeAddress:   msg.Address,
-			Timestamp:     msg.Timestamp,
-			Confirmations: len(msg.Evidence),
-		}
-
+		// Get a message from the public queue
+		msg := <-o.Publication
+		// TODO: Apply any other process to the message
 		// Send the newly received message to the broadcast channel
-		o.Broadcast <- liteMessage
+		o.Broadcast <- msg
 	}
-}
-
-// Prepare and start the main routines
-func (o OracleServer) Initialize() {
-
-	http.HandleFunc(fmt.Sprintf("/%s/socket/latest", APIVersion), o.handleWebSocketConnections)
-	http.HandleFunc(fmt.Sprintf("/%s/chain", APIVersion), o.getBlock)
-	http.HandleFunc(fmt.Sprintf("/%s/latest", APIVersion), o.getLatestBlocks)
-
-	// Launch subrouting to handle messages
-	go o.broadcastMessages()
 }

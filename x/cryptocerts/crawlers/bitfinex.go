@@ -4,88 +4,152 @@
 package crawlers
 
 import (
+	"bytes"
 	"encoding/json"
-	"reflect"
+	"fmt"
+	"math"
 	"time"
+	"unicode"
 
-	"../types"
+	cctypes "github.com/aquarelle-tech/darkmatter/x/cryptocerts/internal/types"
+	"github.com/golang/glog"
+	"github.com/gorilla/websocket"
 )
 
 const (
-	BITFINEX_MODULE_NAME = "Bitfinex REST API"
-	BITFINEX_APIURL      = "https://api-pub.bitfinex.com/v2/ticker/tBTCUSD"
+	BitfinexUID             = "bitfinex"
+	BitfinexWebsocketAPIUrl = "wss://api-pub.bitfinex.com/ws/2"
+	BitfinexUSDBTCSymbol    = "tBTCUSD"
 )
 
-// The REST API client to get data from Bitfinex
+// BitfinexCrawler implements the  REST API client to get data from Bitfinex
 type BitfinexCrawler struct {
-	DataCrawler types.Crawler
-	Ticker      string
+	*GenericCrawler
 }
 
-// Creates a new crawler
-func NewBitfinexCrawler() BitfinexCrawler {
-	crawler := types.NewCrawler(BITFINEX_APIURL)
+var (
+	orderBookReceived = false
+)
 
-	return BitfinexCrawler{
-		DataCrawler: crawler,
+// NewBitfinexCrawler creates a new crawler
+func NewBitfinexCrawler(publication chan cctypes.QuotePriceData) BitfinexCrawler {
+
+	c := BitfinexCrawler{
+		GenericCrawler: NewGenericExchangeCrawler(BitfinexWebsocketAPIUrl, publication),
+	}
+
+	// work around to "create" the methods overriding in  struct
+	c.serializeEvent = c.SerializeBitfinexEvent
+	c.initializeConnection = c.InitializeBitfinexConnection
+	c.getUID = c.GetUID
+
+	c.Start()
+
+	return c
+}
+
+// InitializeBitfinexConnection send the subscription messages
+func (crawler *BitfinexCrawler) InitializeBitfinexConnection(c *websocket.Conn) {
+
+	subscriptionMessage := fmt.Sprintf("{\"event\": \"subscribe\", \"channel\": \"book\", \"prec\": \"R0\", \"len\": 100, \"symbol\" : \"%s\"}", BitfinexUSDBTCSymbol)
+	if err := c.WriteMessage(websocket.TextMessage, []byte(subscriptionMessage)); err != nil {
+		glog.Error("Can´t start the subscription to Bitfinex API. %v", err)
 	}
 }
 
-// Return the name of this crawler
-func (c BitfinexCrawler) GetName() string {
-	return BITFINEX_MODULE_NAME
-}
+// SerializeBitfinexEvent transform the message received from Bitfinex
+func (crawler *BitfinexCrawler) SerializeBitfinexEvent(message []byte, c *websocket.Conn) error {
 
-func (c BitfinexCrawler) GetTicker() string {
-	return c.Ticker
-}
+	jsonMsg := bytes.TrimLeftFunc(message, unicode.IsSpace) // remove the first spaces to ensure to get a valid char in the firs pos
+	err := error(nil)
 
-// Serializes a json to a TickerInfo24 type
-func (c BitfinexCrawler) ToQuotePriceInfo(jsonData []byte) types.QuotePriceInfo {
-
-	var result types.QuotePriceInfo
-
-	aux := make([]interface{}, 16)
-	if err := json.Unmarshal(jsonData, &aux); err != nil {
-		panic(err)
+	// either a channel data array or an event object, raw json encoding
+	if bytes.HasPrefix(jsonMsg, []byte("[")) {
+		err = crawler.parseMessage(message)
+	} else if bytes.HasPrefix(jsonMsg, []byte("{")) {
+		return nil
+	} else {
+		errorMsg := fmt.Sprintf("Unexpected message from Bitfinex websocket: %s", message)
+		glog.Error(errorMsg)
+		return nil
 	}
 
-	result = types.QuotePriceInfo{}
-	result.Volume = getFloat(aux[7])
-	result.HighPrice = getFloat(aux[8])
-	// result.OpenPrice, _ = strconv.ParseFloat(aux.OpenPrice, 32)
-
-	return result
+	return err
 }
 
-func getFloat(unk interface{}) float64 {
-	v := reflect.ValueOf(unk)
-	floatType := reflect.TypeOf(float64(0))
-	fv := v.Convert(floatType)
-	return fv.Float()
-}
+func (crawler *BitfinexCrawler) parseMessage(message []byte) error {
 
-func (c BitfinexCrawler) SetTicker(quotedCurrency string) {
-
-	switch quotedCurrency {
-	case "USD":
-		c.Ticker = "BTCUSD"
-	}
-}
-
-// Helper function to convert the json from Bitfinex´s API to a QuotePriceInfo instance
-func (c BitfinexCrawler) Crawl(quotedCurrency string, done chan types.QuotePriceInfo) {
-
-	c.SetTicker(quotedCurrency)
-	jsonData, err := c.DataCrawler.Get()
-
-	if err != nil {
-		return
+	// The first message after the connection is an snapshot of the order book
+	if !orderBookReceived {
+		orderBookReceived = true
+		return nil
 	}
 
-	priceInfo := c.ToQuotePriceInfo(jsonData)
-	priceInfo.Timestamp = time.Now().Unix()
-	priceInfo.DataURL = BITFINEX_APIURL
-	priceInfo.ExchangeUID = "bitfinex"
-	done <- priceInfo
+	var raw []interface{}
+	if err := json.Unmarshal(message, &raw); err != nil {
+		glog.Errorf("Cannot unserialize the Bitfinex´s data message! %v", err)
+		return err
+	}
+
+	switch data := raw[1].(type) {
+	case string:
+		switch data {
+		case "hb":
+			// no-op
+			return nil
+		case "cs":
+			// TODO: Manage checksums! no-op for now
+			return nil
+			// if checksum, ok := raw[2].(float64); ok {
+			// 	return c.handleChecksumChannel(chanID, int(checksum))
+			// } else {
+			// 	c.log.Error("Unable to parse checksum")
+			// }
+		default:
+			glog.Warning("Bitfinex: Message type not managed! %s", message)
+			return nil
+		}
+	case []interface{}:
+
+		price := data[1].(float64)
+		qty := data[2].(float64)
+
+		if price > 0 {
+			if qty > 0 { // bids
+				crawler.bidPrice += price
+				crawler.bidQty += qty
+				crawler.lowBid = math.Min(crawler.lowBid, price)
+				crawler.highBid = math.Max(crawler.highBid, price)
+
+				crawler.bidVolume++
+				// Store the evidence
+				crawler.evidence = append(crawler.evidence, cctypes.QuotePriceEvidence{
+					Bids:        [][]string{{fmt.Sprintf("%f", price), fmt.Sprintf("%f", qty)}},
+					Timestamp:   uint64(time.Now().Unix()),
+					ExchangeUID: crawler.GetUID(),
+				})
+
+			} else { // asks
+				crawler.askPrice += price
+				crawler.askQty += math.Abs(qty)
+				crawler.lowAsk = math.Min(crawler.lowAsk, price)
+				crawler.highAsk = math.Max(crawler.highAsk, price)
+
+				crawler.askVolume++
+				// Store the evidence
+				crawler.evidence = append(crawler.evidence, cctypes.QuotePriceEvidence{
+					Asks:        [][]string{{fmt.Sprintf("%f", price), fmt.Sprintf("%f", qty)}},
+					Timestamp:   uint64(time.Now().Unix()),
+					ExchangeUID: crawler.GetUID(),
+				})
+			}
+		}
+	}
+
+	return nil
+}
+
+// GetUID return the name of this crawler
+func (crawler BitfinexCrawler) GetUID() string {
+	return BitfinexUID
 }

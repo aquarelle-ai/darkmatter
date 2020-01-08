@@ -3,6 +3,9 @@ package database
 import (
 	"encoding/binary"
 	"encoding/json"
+	"unsafe"
+
+	"github.com/golang/glog"
 
 	"github.com/aquarelle-tech/darkmatter/types"
 	"github.com/dgraph-io/badger"
@@ -16,13 +19,13 @@ const (
 	FixedKeyPrefix     = 0xFF // Any other key
 )
 
-// Implements the KVStore interface
+// Store implements the KVStore interface
 type Store struct {
 	StorFileLocation string
 	storHandler      *badger.DB
 }
 
-// Creates a new store for key-value pairs
+// NewKVStore creates a new store for key-value pairs
 func NewKVStore(locationDirectory string) types.KVStore {
 
 	// Open badger
@@ -42,21 +45,21 @@ func NewKVStore(locationDirectory string) types.KVStore {
 	return kvs
 }
 
-// Store a value in the database indexed by an uint64
+// storeUIntIndex store a value in the database indexed by an uint64
 func storeUIntIndex(txn *badger.Txn, key uint64, value []byte, prefix byte) error {
 
 	index := make([]byte, 8)
-	binary.LittleEndian.PutUint64(index, key)
+	binary.BigEndian.PutUint64(index, key)
 	index = append([]byte{prefix}, index...)
 
 	return txn.Set(index, value)
 }
 
-// Read a value from the database indexed by an uint64
+// readUIntIndex read a value from the database indexed by an uint64
 func readUIntIndex(txn *badger.Txn, key uint64, prefix byte) ([]byte, error) {
 
 	index := make([]byte, 8)
-	binary.LittleEndian.PutUint64(index, key)
+	binary.BigEndian.PutUint64(index, key)
 	index = append([]byte{prefix}, index...)
 
 	item, err := txn.Get(index)
@@ -67,14 +70,14 @@ func readUIntIndex(txn *badger.Txn, key uint64, prefix byte) ([]byte, error) {
 	return item.ValueCopy(nil)
 }
 
-// Store a value in the database indexed by an uint64
+// storeStringIndex store a value in the database indexed by an uint64
 func storeStringIndex(txn *badger.Txn, key string, value []byte, prefix byte) error {
 
 	index := append([]byte{prefix}, []byte(key)...)
 	return txn.Set(index, value)
 }
 
-// Read a value from the database indexed by an uint64
+// readStringIndex read a value from the database indexed by an uint64
 func readStringIndex(txn *badger.Txn, key string, prefix byte) ([]byte, error) {
 
 	index := append([]byte{prefix}, []byte(key)...)
@@ -86,34 +89,44 @@ func readStringIndex(txn *badger.Txn, key string, prefix byte) ([]byte, error) {
 	return item.ValueCopy(nil)
 }
 
-// Store a full block in the database. The block will be indexed by their timestamp and Height
+// StoreBlock store a full block in the database. The block will be indexed by their timestamp and Height
 func (s Store) StoreBlock(block types.FullSignedBlock) error {
+
+	glog.Infof("Storing block %s", block.Hash)
 
 	// Serialize all the parts: block in json
 	bytes, err := json.Marshal(block)
+	glog.Infof("Marshaled content: %d bytes (payload length: %d bytes)", len(bytes), unsafe.Sizeof(block.Payload))
 
 	err = s.storHandler.Update(func(txn *badger.Txn) error {
 
 		var txErr error
 		// Store the hash as a key. This is the main register
 		if txErr = storeStringIndex(txn, block.Hash, bytes, HashKeyPrefix); txErr == nil {
+			glog.Infof("Stored block %s - Height = %d, Payload len = %d", block.Hash, block.Height, unsafe.Sizeof(block.Payload))
 			// And now store the indexes. Using this indexes it is possible to retrieve the hash, and next the block
 			if txErr = storeUIntIndex(txn, block.Timestamp, []byte(block.Hash), TimestampKeyPrefix); txErr != nil { // By timestamp
 				return txErr
 			}
+			glog.Infof("Stored indexes (by timestamp) for %s - Height = %d", block.Hash, block.Height)
 
 			if txErr = storeUIntIndex(txn, block.Height, []byte(block.Hash), HeightKeyPrefix); txErr != nil { // By block Height
 				return txErr
 			}
+			glog.Infof("Stored indexes (by block´s height) for %s - Height = %d", block.Hash, block.Height)
 		}
 
 		return txErr
 	})
 
+	if err != nil {
+		glog.Error(err)
+	}
+
 	return err
 }
 
-// Read a block from the database using their hash
+// GetBlock read a block from the database using their hash
 func (s Store) GetBlock(hash string) (*types.FullSignedBlock, error) {
 
 	var block types.FullSignedBlock
@@ -152,7 +165,7 @@ func (s Store) GetLatestBlocks(timestamp uint64, n int) ([]types.FullSignedBlock
 			k := item.Key()
 
 			if k[0] == TimestampKeyPrefix { // Check only the timestamp indexes
-				storedTimestamp := binary.LittleEndian.Uint64((k[1:]))
+				storedTimestamp := binary.BigEndian.Uint64((k[1:]))
 				if storedTimestamp <= timestamp {
 					// Get the value
 					value, err := item.ValueCopy(nil)

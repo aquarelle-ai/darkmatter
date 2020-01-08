@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"log"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -28,33 +30,17 @@ type KVStore interface {
 	FindBlockByHeight(Height uint64) (*FullSignedBlock, error)
 }
 
-// LiteIndexValueMessage is the message model used to be send to users and index the blocks
-type LiteIndexValueMessage struct {
-	Hash   string `json:"hash"`
-	Height uint64 `json:"height"`
-	// PriceIndex    float64 `json:"priceIndex"`
-	// Quoted        string  `json:"quote"`
-	NodeAddress   string `json:"nodeAddress"`
-	Timestamp     uint64 `json:"timestamp"`
-	Confirmations int    `json:"confirmations"`
-}
-
 // FullSignedBlock is the message to send to the connected clients through websocket
 type FullSignedBlock struct {
-	Hash      string      `json:"hash"`
-	Height    uint64      `json:"height"`
-	Timestamp uint64      `json:"timestamp"`
-	Payload   interface{} `json:"data"`
-
-	// AveragePrice  float64 `json:"avgPrice"`
-	// AverageVolume float64 `json:"avgVolumen"`
-	// Ticker        string  `json:"ticker"`
-
-	PreviousHash    string   `json:"previousHash"`
-	Address         string   `json:"address"`
-	PreviousAddress string   `json:"previousAddress"`
-	Memo            string   `json:"memo"`
-	Evidence        []Result `json:"evidence"`
+	Hash            string      `json:"hash"`
+	Height          uint64      `json:"height"`
+	Timestamp       uint64      `json:"timestamp"`
+	Payload         interface{} `json:"payload"`
+	PreviousHash    string      `json:"previousHash"`
+	Address         string      `json:"address"`
+	PreviousAddress string      `json:"previousAddress"`
+	Memo            string      `json:"memo"`
+	Evidence        interface{} `json:"evidence"`
 }
 
 // CreateHash calculates the hash for a block
@@ -62,7 +48,7 @@ func (block *FullSignedBlock) CreateHash() error {
 
 	// create a hash the result
 	block.Hash = "" // To asure a clean hash
-	hash, err := calculateHash(block)
+	hash, err := CalculateHash(block)
 	if err == nil {
 		block.Hash = hash
 	}
@@ -74,7 +60,7 @@ func (block *FullSignedBlock) CreateHash() error {
 	return err // No error
 }
 
-// Implement the Stringer interface
+// string implement the Stringer interface
 func (block FullSignedBlock) String() string {
 	bytes, err := json.Marshal(block)
 	if err != nil {
@@ -84,40 +70,11 @@ func (block FullSignedBlock) String() string {
 	return string(bytes)
 }
 
-// GetDataJob is the job message to insert in a queue to be processed as part of the the Mapping Stage
-type GetDataJob struct {
-	Quote       string
-	DataCrawler interface{}
-}
-
-// Result is the message that will receive the results from the mapped nodes in the Reduce Stage
-type Result struct {
-	CrawlerName string `json:"name"`
-	Data        []byte `json:"data"`
-	HasError    bool   `json:"hasError"`
-	Timestamp   int64  `json:"timestamp"`
-	Ticker      string `json:"ticker"`
-	Hash        string `json:"hash"`
-}
-
-// CreateHash creates a double hash (sha256(sha256)) for all the content
-func (result *Result) CreateHash() error {
-	// create a hash the result
-	result.Hash = "" // To asure a clean hash
-	hash, err := calculateHash(result)
-
-	if err == nil {
-		result.Hash = hash
-	}
-
-	return err // No error
-}
-
-// Generate a hash using a double operation over the serialized content of object
-func calculateHash(obj interface{}) (string, error) {
+// CalculateHash generate a hash using a double operation over the serialized content of object
+func CalculateHash(obj interface{}) (string, error) {
 	bytes, err := json.Marshal(obj)
 	if err != nil {
-		log.Println("Error serializing message", err)
+		glog.Errorf("Error serializing message", err)
 		return "", err
 	}
 	// Sign the content of block including the hash of DarkMatter

@@ -3,8 +3,9 @@ package database
 
 import (
 	"encoding/json"
-	"log"
+	"github.com/golang/glog"
 	"time"
+	"unsafe"
 
 	"github.com/aquarelle-tech/darkmatter/types"
 )
@@ -23,14 +24,13 @@ const (
 
 var (
 	// PublicBlockDatabase is the main instance to manage the database
-	PublicBlockDatabase *BlockChain = NewBlockChain(MainBlockChainName, BlockchainFileLocation)
+	PublicBlockDatabase = NewBlockChain(MainBlockChainName, BlockchainFileLocation)
 )
 
 // BlockChain is the main data model to handle the blocks
 type BlockChain struct {
-	Name      string
-	IsTestnet bool
-
+	Name        string
+	IsTestnet   bool
 	latestBlock *types.FullSignedBlock
 	Store       types.KVStore
 }
@@ -44,8 +44,10 @@ func NewBlockChain(name string, locationDirectory string) *BlockChain {
 }
 
 // NewFullSignedBlock creates a new signed block to store
-func (db *BlockChain) NewFullSignedBlock(data interface{}, sources []types.Result, memo string) types.FullSignedBlock {
+func (db *BlockChain) NewFullSignedBlock(data interface{}, evidence interface{}, memo string) (types.FullSignedBlock, error) {
 	//  func (db *BlockChain) NewFullSignedBlock(ticker string, avgPrice float64, avgVolumen float64, sources []types.Result, memo string) types.FullSignedBlock {
+
+	glog.Infof("New full signed block: Data length=%d", unsafe.Sizeof(data))
 
 	// Create a "protomessage" in order to be hashed with the hash inside
 	var latestHash string
@@ -61,14 +63,11 @@ func (db *BlockChain) NewFullSignedBlock(data interface{}, sources []types.Resul
 	}
 
 	block := types.FullSignedBlock{
-		Height: height,
-		// AveragePrice:  avgVolumen,
-		// AverageVolume: avgPrice,
-		// Ticker:        ticker,
+		Height:       height,
 		Payload:      data,
 		Timestamp:    uint64(time.Now().Unix()),
 		PreviousHash: latestHash, // Chain the current hash with the previous one
-		Evidence:     sources,
+		Evidence:     evidence,
 		Memo:         memo,
 	}
 	// Other settings
@@ -82,40 +81,43 @@ func (db *BlockChain) NewFullSignedBlock(data interface{}, sources []types.Resul
 	db.latestBlock = &block
 	bytes, err := json.Marshal(block)
 	if err != nil {
-		panic(err) //TODO: This error is important!! means that there was not able to create a new block! Needs more code to manage this event
+		glog.Fatalf("The last block could not be stored: block=%s, height=%d", block.Hash, block.Height)
+		return block, err //TODO: This error is important!! means that there was not able to create a new block! Needs more code to manage this event
 	}
 	db.Store.StoreValue(LatestBlockKey, bytes)
 
-	// log.Println("Created a new block", block)
-	return block
+	glog.Infof("Created a new block: %v", block.Hash)
+	return block, nil
 }
 
-// Store the latest hash of the message
+// StoreLatestBlock stores the latest hash of the message
 func (db *BlockChain) StoreLatestBlock() {
 
 	bytes, err := json.Marshal(db.latestBlock)
 	if err != nil {
-		log.Println("Can´t store the latest block. Please check the Store urgently!!")
+		glog.Warning("Can´t store the latest block. Please check the Store urgently!!")
 		return // Don´t continue
 	}
 	db.Store.StoreValue(LatestBlockKey, bytes)
 }
 
-// Get the latest stored block
+// ReadLatestBlock get the latest stored block
 func (db *BlockChain) ReadLatestBlock() {
 
+	glog.Info("Reading the latest block from blockchain")
 	bytes, err := db.Store.GetValue(LatestBlockKey)
 	if err != nil {
-		log.Println("The repository for the latest block don´t exists. Is is the genesis block?")
+		glog.Info("The repository for the latest block don´t exists. Is is the genesis block?")
 		return
 	}
 
 	var block types.FullSignedBlock
 	err = json.Unmarshal(bytes, &block)
 	if err != nil {
-		log.Println("The latest block is corrupt or invalid")
+		glog.Warning("The latest block is corrupt or invalid")
 		return
 	}
 
 	db.latestBlock = &block
+	glog.Infof("Returned the latest block from blockchain %s", block.Hash)
 }
